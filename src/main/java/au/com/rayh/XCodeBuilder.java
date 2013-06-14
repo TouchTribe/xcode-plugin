@@ -38,6 +38,7 @@ import hudson.util.CopyOnWriteList;
 import hudson.util.FormValidation;
 import hudson.util.QuotedStringTokenizer;
 import net.sf.json.JSONObject;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
 import org.jenkinsci.plugins.tokenmacro.TokenMacro;
@@ -47,6 +48,7 @@ import org.kohsuke.stapler.StaplerRequest;
 
 import javax.servlet.ServletException;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -403,7 +405,7 @@ public class XCodeBuilder extends Builder {
         }
         listener.getLogger().println(Messages.XCodeBuilder_DebugInfoLineDelimiter());
 
-        // Build
+        // BuildInfo
         StringBuilder xcodeReport = new StringBuilder(Messages.XCodeBuilder_invokeXcodebuild());
         XCodeBuildOutputParser reportGenerator = new XCodeBuildOutputParser(projectRoot, listener);
         List<String> commandLine = Lists.newArrayList(getDescriptor().getXcodebuildPath());
@@ -478,6 +480,13 @@ public class XCodeBuilder extends Builder {
             xcodeReport.append(", codeSignIdentity: ").append(codeSigningIdentity);
         } else {
             xcodeReport.append(", codeSignIdentity: DEFAULT");
+        }
+        if (!StringUtils.isEmpty(embeddedProfileFile)) {
+            String name = FilenameUtils.getBaseName(embeddedProfileFile);
+            commandLine.add("PROVISIONING_PROFILE=" + name);
+            xcodeReport.append(", provisioningProfile: ").append(name);
+        } else {
+            xcodeReport.append(", provisioningProfile: DEFAULT");
         }
 
         // Additional (custom) xcodebuild arguments

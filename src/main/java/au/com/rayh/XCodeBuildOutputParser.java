@@ -89,7 +89,7 @@ public class XCodeBuildOutputParser {
             super.write(b);
             if((char)b == '\n') {
                 try {
-                    handleLine(buffer.toString());
+//                    handleLine(buffer.toString());
                     buffer = new StringBuilder();
                 } catch(Exception e) {  // Very fugly
                     buildListener.fatalError(e.getMessage(), e);
@@ -131,75 +131,79 @@ public class XCodeBuildOutputParser {
     }
 
     protected void handleLine(String line) throws ParseException, IOException, InterruptedException, JAXBException {
-        Matcher m = START_SUITE.matcher(line);
-        if(m.find()) {
-            currentTestSuite = new TestSuite(InetAddress.getLocalHost().getHostName(), m.group(1), dateFormat.parse(m.group(2)));
-            return;
+        Matcher m;
+        if (line.contains("Test Suite")) {
+            m = START_SUITE.matcher(line);
+            if(m.find()) {
+                currentTestSuite = new TestSuite(InetAddress.getLocalHost().getHostName(), m.group(1), dateFormat.parse(m.group(2)));
+                return;
+            }
+
+            m = END_SUITE.matcher(line);
+            if(m.find()) {
+                if(currentTestSuite==null) return; // if there is no current suite, do nothing
+
+                currentTestSuite.setEndTime(dateFormat.parse(m.group(2)));
+                writeTestReport();
+
+                currentTestSuite = null;
+                return;
+            }
         }
+        if (line.contains("Test Case") || line.contains(": error:")) {
+            m = START_TESTCASE.matcher(line);
+            if(m.find()) {
+                currentTestCase = new TestCase(currentTestSuite.getName(), m.group(1));
+                return;
+            }
 
-        m = END_SUITE.matcher(line);
-        if(m.find()) {
-            if(currentTestSuite==null) return; // if there is no current suite, do nothing
+            m = END_TESTCASE.matcher(line);
+            if(m.find()) {
+                requireTestSuite();
+                requireTestCase(m.group(1));
 
-            currentTestSuite.setEndTime(dateFormat.parse(m.group(2)));
-            writeTestReport();
+                currentTestCase.setTime(Float.valueOf(m.group(2)));
+                currentTestSuite.getTestCases().add(currentTestCase);
+                currentTestSuite.addTest();
+                currentTestCase = null;
+                return;
+            }
 
-            currentTestSuite = null;
-            return;
+            m = ERROR_TESTCASE.matcher(line);
+            if(m.find()) {
+
+                String errorLocation = m.group(1);
+                String testSuite = m.group(2);
+                String testCase = m.group(3);
+                String errorMessage = m.group(4);
+
+                requireTestSuite(testSuite);
+                requireTestCase(testCase);
+
+                TestFailure failure = new TestFailure(errorMessage, errorLocation);
+                currentTestCase.getFailures().add(failure);
+                return;
+            }
+
+            m = FAILED_TESTCASE.matcher(line);
+            if(m.find()) {
+                requireTestSuite();
+                requireTestCase(m.group(1));
+                currentTestSuite.addTest();
+                currentTestSuite.addFailure();
+                currentTestCase.setTime(Float.valueOf(m.group(2)));
+                currentTestSuite.getTestCases().add(currentTestCase);
+                currentTestCase = null;
+                return;
+            }
         }
-
-        m = START_TESTCASE.matcher(line);
-        if(m.find()) {
-            currentTestCase = new TestCase(currentTestSuite.getName(), m.group(1));
-            return;
+        if (line.contains("failed with exit code")) {
+            m = FAILED_WITH_EXIT_CODE.matcher(line);
+            if(m.find()) {
+                exitCode = Integer.valueOf(m.group(1));
+                return;
+            }
         }
-
-        m = END_TESTCASE.matcher(line);
-        if(m.find()) {
-            requireTestSuite();
-            requireTestCase(m.group(1));
-
-            currentTestCase.setTime(Float.valueOf(m.group(2)));
-            currentTestSuite.getTestCases().add(currentTestCase);
-            currentTestSuite.addTest();
-            currentTestCase = null;
-            return;
-        }
-
-        m = ERROR_TESTCASE.matcher(line);
-        if(m.find()) {
-
-            String errorLocation = m.group(1);
-            String testSuite = m.group(2);
-            String testCase = m.group(3);
-            String errorMessage = m.group(4);
-
-            requireTestSuite(testSuite);
-            requireTestCase(testCase);
-
-            TestFailure failure = new TestFailure(errorMessage, errorLocation);
-            currentTestCase.getFailures().add(failure);
-            return;
-        }
-
-        m = FAILED_TESTCASE.matcher(line);
-        if(m.find()) {
-            requireTestSuite();
-            requireTestCase(m.group(1));
-            currentTestSuite.addTest();
-            currentTestSuite.addFailure();
-            currentTestCase.setTime(Float.valueOf(m.group(2)));
-            currentTestSuite.getTestCases().add(currentTestCase);
-            currentTestCase = null;
-            return;
-        }
-
-        m = FAILED_WITH_EXIT_CODE.matcher(line);
-        if(m.find()) {
-            exitCode = Integer.valueOf(m.group(1));
-            return;
-        }
-
         if(line.contains("BUILD FAILED")) {
             exitCode = -1;
         }

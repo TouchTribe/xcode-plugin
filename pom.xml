@@ -32,7 +32,7 @@
     <relativePath />
   </parent>
   <artifactId>xcode-plugin</artifactId>
-  <version>1.4-SNAPSHOT</version>
+  <version>1.4.3-SNAPSHOT</version>
   <packaging>hpi</packaging>
   <name>Xcode integration</name>
   <description>This plugin adds the ability to call Xcode command line tools to automate build and packaging iOS applications (iPhone, iPad, ...).</description>
@@ -79,6 +79,11 @@
     </pluginRepository>
   </pluginRepositories>
   <dependencies>
+    <dependency>
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>credentials</artifactId>
+      <version>1.4</version>
+    </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>token-macro</artifactId>
